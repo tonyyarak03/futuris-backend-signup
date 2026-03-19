@@ -13,7 +13,8 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 
 // DB
-mongoose.connect("mongodb://127.0.0.1:27017/futuris");
+//mongoose.connect("mongodb://127.0.0.1:27017/futuris");
+console.log("MongoDB disabled for deployment");
 
 // TEST ROUTE
 app.get("/", (req, res) => {
@@ -21,6 +22,8 @@ app.get("/", (req, res) => {
 });
 
 // START
-app.listen(5000, () => {
-  console.log("Server running on port 5000");
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
 });
