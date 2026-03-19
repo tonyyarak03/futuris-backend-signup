@@ -1,27 +1,51 @@
 const express = require("express");
 const router = express.Router();
-const User = require("../models/User");
 const bcrypt = require("bcrypt");
 
+// ================= REGISTER =================
+router.post("/register", async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      username,
+      email,
+      password
+    } = req.body;
+
+    // Simulate hashing (optional but cleaner)
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // TEMP RESPONSE (no database yet)
+    res.json({
+      message: "User registered successfully",
+      user: {
+        username: username,
+        insights: ["Welcome to Futuris"]
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Error registering user" });
+  }
+});
+
+// ================= LOGIN =================
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(400).json({ message: "User not found" });
+    // TEMP LOGIN (since no DB)
+    if (!email || !password) {
+      return res.status(400).json({ message: "Missing credentials" });
     }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-if (!isMatch) {
-  return res.status(400).json({ message: "Wrong password" });
-}
 
     res.json({
       message: "Login successful",
-      user: user
+      user: {
+        username: "DemoUser",
+        insights: ["Welcome back to Futuris"]
+      }
     });
 
   } catch (err) {
