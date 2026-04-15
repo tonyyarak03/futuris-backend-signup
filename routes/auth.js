@@ -61,14 +61,18 @@ router.post("/register", async (req, res) => {
       message: "User created successfully",
       user: {
         username: newUser.username,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
         insights: newUser.insights
       }
     });
+
   } catch (error) {
     console.error("REGISTER ERROR:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 // ================= LOGIN =================
 router.post("/login", async (req, res) => {
@@ -97,9 +101,12 @@ router.post("/login", async (req, res) => {
       message: "Login successful",
       user: {
         username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
         insights: user.insights || []
       }
     });
+
   } catch (error) {
     console.error("LOGIN ERROR:", error);
     res.status(500).json({ message: "Server error" });
