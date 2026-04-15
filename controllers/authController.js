@@ -1,6 +1,5 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
-const generateInsights = require("../utils/insights");
 
 exports.register = async (req, res) => {
   try {
@@ -11,22 +10,25 @@ exports.register = async (req, res) => {
       gender,
       username,
       email,
-      password,
-      lifeFocus,
-      state,
-      intent
+      password
     } = req.body;
 
-    // VALIDATION
-    if (!firstName || !lastName || !email || !password) {
-      return res.status(400).json({ message: "Missing fields" });
+    if (
+      !firstName ||
+      !lastName ||
+      !dateOfBirth ||
+      !gender ||
+      !username ||
+      !email ||
+      !password
+    ) {
+      return res.status(400).json({ message: "Please fill all fields" });
     }
 
     if (password.length < 6) {
       return res.status(400).json({ message: "Weak password" });
     }
 
-    // CHECK EXISTING USER
     const existingUser = await User.findOne({
       $or: [{ email }, { username }]
     });
@@ -35,10 +37,8 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // HASH PASSWORD
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // CREATE USER
     const newUser = new User({
       firstName,
       lastName,
@@ -47,13 +47,8 @@ exports.register = async (req, res) => {
       username,
       email,
       password: hashedPassword,
-      lifeFocus,
-      state,
-      intent
+      insights: ["Welcome to Futuris"]
     });
-
-    // GENERATE INSIGHTS
-    newUser.insights = generateInsights(newUser);
 
     await newUser.save();
 
@@ -64,8 +59,39 @@ exports.register = async (req, res) => {
         insights: newUser.insights
       }
     });
-
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Missing credentials" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    res.status(200).json({
+      message: "Login successful",
+      user: {
+        username: user.username,
+        insights: user.insights || []
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 };
