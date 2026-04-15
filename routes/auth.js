@@ -1,11 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const bcrypt = require("bcrypt");
 const User = require("../models/User");
+const bcrypt = require("bcrypt");
 
 // ================= REGISTER =================
 router.post("/register", async (req, res) => {
   try {
+    console.log("REGISTER REQUEST RECEIVED:", req.body);
+
     const {
       firstName,
       lastName,
@@ -13,10 +15,7 @@ router.post("/register", async (req, res) => {
       gender,
       username,
       email,
-      password,
-      lifeFocus,
-      state,
-      intent
+      password
     } = req.body;
 
     if (
@@ -26,12 +25,13 @@ router.post("/register", async (req, res) => {
       !gender ||
       !username ||
       !email ||
-      !password ||
-      !lifeFocus ||
-      !state ||
-      !intent
+      !password
     ) {
       return res.status(400).json({ message: "Please fill all fields" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Weak password" });
     }
 
     const existingUser = await User.findOne({
@@ -52,16 +52,13 @@ router.post("/register", async (req, res) => {
       username,
       email,
       password: hashedPassword,
-      lifeFocus,
-      state,
-      intent,
       insights: ["Welcome to Futuris"]
     });
 
     await newUser.save();
 
     res.status(201).json({
-      message: "User registered successfully",
+      message: "User created successfully",
       user: {
         username: newUser.username,
         insights: newUser.insights
@@ -69,15 +66,17 @@ router.post("/register", async (req, res) => {
     });
   } catch (error) {
     console.error("REGISTER ERROR:", error);
-    res.status(500).json({ message: "Error registering user" });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
 // ================= LOGIN =================
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    console.log("LOGIN REQUEST RECEIVED:", req.body);
+
+    const { email, password } = req.body;
+
     if (!email || !password) {
       return res.status(400).json({ message: "Missing credentials" });
     }
@@ -85,24 +84,24 @@ router.post("/login", async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({ message: "User not found" });
+      return res.status(400).json({ message: "Invalid email or password" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid password" });
+      return res.status(400).json({ message: "Invalid email or password" });
     }
 
-    res.json({
+    res.status(200).json({
       message: "Login successful",
       user: {
         username: user.username,
-        insights: user.insights
+        insights: user.insights || []
       }
     });
-  } catch (err) {
-    console.error("LOGIN ERROR:", err);
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
