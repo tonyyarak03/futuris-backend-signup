@@ -10,6 +10,10 @@ const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT || 587),
   secure: String(process.env.SMTP_SECURE) === "true",
+  family: 4,
+  connectionTimeout: 20000,
+  greetingTimeout: 20000,
+  socketTimeout: 30000,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
@@ -162,7 +166,6 @@ router.post("/forgot-password", async (req, res) => {
             Reset Password
           </a>
           <p style="margin-top:20px;">If you did not request this, you can ignore this email.</p>
-          <p style="margin-top:10px; font-size:12px; color:#666;">Token: ${resetToken}</p>
         </div>
       `
     });
