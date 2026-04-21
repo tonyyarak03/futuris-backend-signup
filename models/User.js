@@ -10,7 +10,22 @@ const userSchema = new mongoose.Schema({
   email: { type: String, unique: true },
   password: String,
 
-  insights: [String]
+  insights: [String],
+
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
+
+  verificationCode: {
+    type: String,
+    default: ""
+  },
+
+  verificationCodeExpiresAt: {
+    type: Date,
+    default: null
+  }
 });
 
 module.exports = mongoose.model("User", userSchema);
