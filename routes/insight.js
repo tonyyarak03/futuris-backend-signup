@@ -3,6 +3,9 @@ const router = express.Router();
 
 router.post("/generate", async (req, res) => {
   try {
+    console.log("==== /api/insight/generate HIT ====");
+    console.log("BODY:", JSON.stringify(req.body, null, 2));
+
     const {
       userId,
       firstName,
@@ -71,27 +74,34 @@ router.post("/generate", async (req, res) => {
         : "No local scores detected.";
 
     const normalizedCategory = normalizeCategory(category);
-    const title = `${capitalizeCategory(normalizedCategory)} Insight`;
+    const prettyTitle = `${capitalizeWords(normalizedCategory)} Insight`;
 
     const systemPrompt = `
-You are Futuris, an intelligent mobile-app insight generator.
+You are Futuris, an intelligent insight generator for a mobile app.
 
-You generate:
-1. One short personalized insight for the requested category
-2. Exactly two follow-up questions based on that insight
-3. Short supporting fields for advice, energy, focus, and confidence
+Your job:
+- Generate one short, personalized insight for the requested category.
+- Generate exactly two short follow-up questions based on that insight.
+- Return only valid JSON.
+- Do not wrap the JSON in markdown.
+- Do not include any text before or after the JSON.
+- Do not mention that you are AI.
+- Do not use the user's name inside the insight.
+- Keep the insight to 2 to 4 sentences.
+- Keep the tone polished, mystical, and app-friendly.
+- If prior insight/follow-up context is present, generate a fresh next-step insight rather than repeating the old one.
 
-Rules:
-- Keep the tone mystical, polished, personal, and app-friendly.
-- Do not mention that you are an AI.
-- Do not mention hidden reasoning.
-- Do not use the user's name inside the "insight".
-- The insight must be 2 to 4 sentences max.
-- The follow-up questions must clearly relate to the insight.
-- The two questions must be different from each other.
-- If the context includes a previous insight and a selected follow-up question, answer that direction with a fresh new insight.
-- Avoid repeating the previous insight wording.
-`.trim();
+JSON format:
+{
+  "title": "Career Insight",
+  "insight": "string",
+  "questions": ["string", "string"],
+  "advice": "string",
+  "energy": "string",
+  "focus": "string",
+  "confidence": 84
+}
+    `.trim();
 
     const userPrompt = `
 User profile:
@@ -108,90 +118,39 @@ User profile:
 - state: ${safeText(state)}
 - intent: ${safeText(intent)}
 
-Behavior context:
+Context:
 - quiz summary: ${safeText(quizSummary)}
 - recent chat summary: ${safeText(recentChatSummary)}
 - detected keywords: ${safeText(keywordsSummary)}
 - local scores: ${safeText(scoresSummary)}
 - local prediction summary: ${safeText(localPrediction)}
 
-Generate a strong Futuris insight for the requested category.
-Then generate exactly two follow-up questions.
-`.trim();
+Important:
+- The response must be category-specific.
+- Generate exactly two different follow-up questions.
+- Questions must clearly relate to the generated insight.
+    `.trim();
 
-    const openAiResponse = await fetch(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: systemPrompt
-            },
-            {
-              role: "user",
-              content: userPrompt
-            }
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "futuris_insight_response",
-              strict: true,
-              schema: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  title: {
-                    type: "string"
-                  },
-                  insight: {
-                    type: "string"
-                  },
-                  questions: {
-                    type: "array",
-                    items: {
-                      type: "string"
-                    },
-                    minItems: 2,
-                    maxItems: 2
-                  },
-                  advice: {
-                    type: "string"
-                  },
-                  energy: {
-                    type: "string"
-                  },
-                  focus: {
-                    type: "string"
-                  },
-                  confidence: {
-                    type: "integer"
-                  }
-                },
-                required: [
-                  "title",
-                  "insight",
-                  "questions",
-                  "advice",
-                  "energy",
-                  "focus",
-                  "confidence"
-                ]
-              }
-            }
+    const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        input: [
+          {
+            role: "system",
+            content: [{ type: "input_text", text: systemPrompt }]
           },
-          temperature: 0.8,
-          max_tokens: 500
-        })
-      }
-    );
+          {
+            role: "user",
+            content: [{ type: "input_text", text: userPrompt }]
+          }
+        ]
+      })
+    });
 
     const rawData = await openAiResponse.json();
 
@@ -203,22 +162,23 @@ Then generate exactly two follow-up questions.
       });
     }
 
-    const content =
-      rawData?.choices?.[0]?.message?.content?.trim() || "";
+    const rawText =
+      typeof rawData.output_text === "string" && rawData.output_text.trim()
+        ? rawData.output_text.trim()
+        : extractOutputText(rawData);
 
-    if (!content) {
-      console.error("Insight OpenAI empty content:", JSON.stringify(rawData, null, 2));
+    if (!rawText) {
+      console.error("Insight OpenAI empty output:", JSON.stringify(rawData, null, 2));
       return res.status(500).json({
         success: false,
-        message: "OpenAI returned empty content"
+        message: "OpenAI returned empty output"
       });
     }
 
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch (parseError) {
-      console.error("Insight JSON parse error:", content);
+    const parsed = parseJsonSafely(rawText);
+
+    if (!parsed) {
+      console.error("Insight JSON parse error:", rawText);
       return res.status(500).json({
         success: false,
         message: "OpenAI output could not be parsed as JSON"
@@ -237,7 +197,7 @@ Then generate exactly two follow-up questions.
 
     return res.json({
       success: true,
-      title: safeResponseText(parsed.title, title),
+      title: safeResponseText(parsed.title, prettyTitle),
       insight: safeResponseText(parsed.insight, ""),
       questions,
       advice: safeResponseText(
@@ -288,7 +248,7 @@ function normalizeCategory(category) {
   }
 }
 
-function capitalizeCategory(text) {
+function capitalizeWords(text) {
   if (!text || typeof text !== "string") return "Futuris";
   return text
     .split(" ")
@@ -322,6 +282,43 @@ function safeResponseText(value, fallback) {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function extractOutputText(data) {
+  try {
+    if (!data || !Array.isArray(data.output)) return "";
+
+    const parts = [];
+
+    for (const item of data.output) {
+      if (!item || !Array.isArray(item.content)) continue;
+
+      for (const content of item.content) {
+        if (typeof content?.text === "string") {
+          parts.push(content.text);
+        }
+      }
+    }
+
+    return parts.join("\n").trim();
+  } catch (e) {
+    return "";
+  }
+}
+
+function parseJsonSafely(rawText) {
+  try {
+    return JSON.parse(rawText);
+  } catch (e) {
+    const match = rawText.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+
+    try {
+      return JSON.parse(match[0]);
+    } catch (secondError) {
+      return null;
+    }
+  }
 }
 
 module.exports = router;
