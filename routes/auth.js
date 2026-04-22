@@ -360,6 +360,60 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// ================= CHANGE PASSWORD (IN APP) =================
+router.post("/change-password", async (req, res) => {
+  try {
+    console.log("CHANGE PASSWORD REQUEST RECEIVED:", req.body);
+
+    const { email, currentPassword, newPassword } = req.body;
+
+    if (!email || !currentPassword || !newPassword) {
+      return res.status(400).json({
+        message: "Email, current password, and new password are required"
+      });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({
+        message: "New password must be at least 6 characters long"
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found"
+      });
+    }
+
+    const isMatch = await bcrypt.compare(String(currentPassword), user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Current password is incorrect"
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(String(newPassword), 10);
+
+    user.password = hashedPassword;
+    await user.save();
+
+    return res.status(200).json({
+      message: "Password changed successfully"
+    });
+
+  } catch (error) {
+    console.error("CHANGE PASSWORD ERROR:", error);
+    return res.status(500).json({
+      message: "Server error"
+    });
+  }
+});
+
 // ================= FORGOT PASSWORD =================
 router.post("/forgot-password", async (req, res) => {
   try {
