@@ -197,18 +197,19 @@ Important:
     const finalInsight = safeResponseText(parsed.insight, "");
 
     if (finalInsight) {
+      const saveLastTenInsights = {
+        $push: {
+          insights: {
+            $each: [finalInsight],
+            $slice: -10
+          }
+        }
+      };
+
       if (mongoose.Types.ObjectId.isValid(userId)) {
-        await User.findByIdAndUpdate(
-          userId,
-          { $push: { insights: finalInsight } },
-          { new: true }
-        );
+        await User.findByIdAndUpdate(userId, saveLastTenInsights, { new: true });
       } else if (email) {
-        await User.findOneAndUpdate(
-          { email: email },
-          { $push: { insights: finalInsight } },
-          { new: true }
-        );
+        await User.findOneAndUpdate({ email: email }, saveLastTenInsights, { new: true });
       }
     }
 
