@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const User = require("../models/User");
 
 router.post("/generate", async (req, res) => {
   try {
@@ -195,10 +196,20 @@ Important:
       });
     }
 
+    const finalInsight = safeResponseText(parsed.insight, "");
+
+    if (userId && finalInsight) {
+      await User.findByIdAndUpdate(
+        userId,
+        { $push: { insights: finalInsight } },
+        { new: true }
+      );
+    }
+
     return res.json({
       success: true,
       title: safeResponseText(parsed.title, prettyTitle),
-      insight: safeResponseText(parsed.insight, ""),
+      insight: finalInsight,
       questions,
       advice: safeResponseText(
         parsed.advice,
