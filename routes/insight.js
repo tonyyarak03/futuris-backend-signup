@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require("mongoose");
 const User = require("../models/User");
 
 router.post("/generate", async (req, res) => {
@@ -55,10 +56,7 @@ router.post("/generate", async (req, res) => {
     const quizSummary =
       safeQuizAnswers.length > 0
         ? safeQuizAnswers
-            .map(
-              (item) =>
-                `Question ${item.questionId}: ${item.selectedOptionText}`
-            )
+            .map((item) => `Question ${item.questionId}: ${item.selectedOptionText}`)
             .join(" | ")
         : "No quiz answers provided.";
 
@@ -198,12 +196,20 @@ Important:
 
     const finalInsight = safeResponseText(parsed.insight, "");
 
-    if (userId && finalInsight) {
-      await User.findByIdAndUpdate(
-        userId,
-        { $push: { insights: finalInsight } },
-        { new: true }
-      );
+    if (finalInsight) {
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        await User.findByIdAndUpdate(
+          userId,
+          { $push: { insights: finalInsight } },
+          { new: true }
+        );
+      } else if (email) {
+        await User.findOneAndUpdate(
+          { email: email },
+          { $push: { insights: finalInsight } },
+          { new: true }
+        );
+      }
     }
 
     return res.json({
